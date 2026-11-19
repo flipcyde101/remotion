@@ -657,7 +657,18 @@ const TimelineSequenceBar: React.FC<{
 				seamY: isPackedClip
 					? Number(style.height) / 2
 					: TIMELINE_CHILD_TRANSITION_SEAM_Y,
-				transitionCutout: null,
+				transitionCutout: isPackedClip
+					? {
+							top: transitionVerticalInset,
+							height: transitionHeight,
+							radius: 4,
+							minWidth: minTransitionAreaWidth,
+							markerDurations: sceneRange?.markerDurations ?? {
+								incoming: null,
+								outgoing: null,
+							},
+						}
+					: null,
 				cropHeight: Number(style.height),
 			},
 			true,

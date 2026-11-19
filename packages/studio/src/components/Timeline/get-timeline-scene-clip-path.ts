@@ -15,6 +15,7 @@ type TimelineSceneClipOptions = {
 		readonly height: number;
 		readonly radius: number;
 		readonly minWidth: number;
+		readonly markerDurations?: TimelineSceneRange['markerDurations'];
 	} | null;
 	readonly cropHeight: number | null;
 };
@@ -57,12 +58,16 @@ export const getTimelineSceneShape = (
 	const incomingCutout =
 		transitionCutout !== null &&
 		sceneRange.transitionInEnd !== null &&
-		(sceneRange.transitionInEnd - sceneRange.from) * pixelsPerFrame >=
+		(transitionCutout.markerDurations?.incoming ??
+			sceneRange.transitionInEnd - sceneRange.from) *
+			pixelsPerFrame >=
 			transitionCutout.minWidth;
 	const outgoingCutout =
 		transitionCutout !== null &&
 		sceneRange.transitionOutStart !== null &&
-		(sceneRange.end - sceneRange.transitionOutStart) * pixelsPerFrame >=
+		(transitionCutout.markerDurations?.outgoing ??
+			sceneRange.end - sceneRange.transitionOutStart) *
+			pixelsPerFrame >=
 			transitionCutout.minWidth;
 	const middle =
 		(Math.min(
@@ -288,18 +293,74 @@ export const getTimelineSceneShape = (
 		const {radius} = transitionCutout;
 		// Follow the visible cutout rather than drawing a hidden stroke through
 		// its center. The concave arcs match the marker's two rounded corners.
+		const outgoingCorner = outgoingCutout
+			? `L${outgoingStartX + radius},${outgoingY} A${radius},${radius} 0 0 0 ${outgoingStartX},${outgoingY + radius}`
+			: `L${outgoingStartX},${outgoingY}`;
+		const incomingCorner = incomingCutout
+			? `L${incomingEndX - radius},${incomingY} A${radius},${radius} 0 0 0 ${incomingEndX},${incomingY - radius}`
+			: `L${incomingEndX},${incomingY}`;
+		if (edges.right !== null && outgoingCutout) {
+			edges.right = `M${outgoingEndX},0 L${outgoingEndX},${outgoingY} ${outgoingCorner} L${outgoingStartX},${height}`;
+		}
+
+		if (edges.left !== null && incomingCutout) {
+			edges.left = `M${incomingStartX},${height} L${incomingStartX},${incomingY} ${incomingCorner} L${incomingEndX},0`;
+		}
+
 		path = [
 			`M${outgoingEndX},0 L${outgoingEndX},${outgoingY}`,
-			outgoingCutout
-				? `L${outgoingStartX + radius},${outgoingY} A${radius},${radius} 0 0 0 ${outgoingStartX},${outgoingY + radius}`
-				: `L${outgoingStartX},${outgoingY}`,
+			outgoingCorner,
 			`L${outgoingStartX},${height} L${incomingStartX},${height} L${incomingStartX},${incomingY}`,
-			incomingCutout
-				? `L${incomingEndX - radius},${incomingY} A${radius},${radius} 0 0 0 ${incomingEndX},${incomingY - radius}`
-				: `L${incomingEndX},${incomingY}`,
+			incomingCorner,
 			`L${incomingEndX},0 Z`,
 		].join(' ');
 		clipPath = `path('${path}')`;
+	}
+
+	if (transitionCutout?.markerDurations && incomingEnd > outgoingStart) {
+		const overlap = (incomingEnd - outgoingStart) * pixelsPerFrame;
+		const {radius} = transitionCutout;
+		if (overlap < radius && (incomingCutout || outgoingCutout)) {
+			const arcOffset =
+				radius - Math.sqrt(radius ** 2 - (radius - overlap) ** 2);
+			const left = (incomingEnd - offsetInFrames) * pixelsPerFrame;
+			const right = (outgoingStart - offsetInFrames) * pixelsPerFrame;
+			const upperRight = (outgoingEnd - offsetInFrames) * pixelsPerFrame;
+			const lowerLeft = (incomingStart - offsetInFrames) * pixelsPerFrame;
+			const upperY = (outgoingMiddle / 100) * height;
+			const lowerY = (middle / 100) * height;
+			const contours = [];
+			if (upperRight > left) {
+				const edge = outgoingCutout
+					? `M${upperRight},0 L${upperRight},${upperY} L${right + radius},${upperY} A${radius},${radius} 0 0 0 ${left},${upperY + arcOffset}`
+					: `M${upperRight},0 L${upperRight},${upperY} L${left},${upperY}`;
+				contours.push(`${edge} L${left},0 Z`);
+				if (edges.right !== null) {
+					edges.right = edge;
+				}
+			}
+
+			if (right > lowerLeft) {
+				const edge = incomingCutout
+					? `M${lowerLeft},${height} L${lowerLeft},${lowerY} L${left - radius},${lowerY} A${radius},${radius} 0 0 0 ${right},${lowerY - arcOffset}`
+					: `M${lowerLeft},${height} L${lowerLeft},${lowerY} L${right},${lowerY}`;
+				contours.push(`${edge} L${right},${height} Z`);
+				if (edges.left !== null) {
+					edges.left = edge;
+				}
+			}
+
+			if (edges.right !== null && right > lowerLeft) {
+				edges.right += ` M${right},${lowerY} L${right},${height}`;
+			}
+
+			if (edges.left !== null && upperRight > left) {
+				edges.left += ` M${left},0 L${left},${upperY}`;
+			}
+
+			path = contours.join(' ');
+			clipPath = `path('${path}')`;
+		}
 	}
 
 	return {

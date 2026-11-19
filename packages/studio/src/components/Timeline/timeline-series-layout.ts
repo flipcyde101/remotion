@@ -19,6 +19,10 @@ export type TimelineSceneRange = {
 	readonly activeEnd: number;
 	readonly transitionInEnd: number | null;
 	readonly transitionOutStart: number | null;
+	readonly markerDurations?: {
+		readonly incoming: number | null;
+		readonly outgoing: number | null;
+	};
 };
 
 // Keep sequence rows and their identities intact. Only their vertical positions

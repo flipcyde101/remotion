@@ -45,6 +45,14 @@ export const getTimelineSceneRange = ({
 	return {
 		from,
 		end,
+		markerDurations: {
+			incoming: incomingTransition
+				? incomingTransition.end - incomingTransition.from
+				: null,
+			outgoing: outgoingTransition
+				? outgoingTransition.end - outgoingTransition.from
+				: null,
+		},
 		activeFrom: Math.max(
 			range?.activeFrom ?? -Infinity,
 			incomingTransition ? (sequence.from + previousEnd) / 2 : sequence.from,
