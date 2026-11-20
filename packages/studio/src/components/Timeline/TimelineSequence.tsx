@@ -364,6 +364,9 @@ const TimelineSequenceBar: React.FC<{
 		readonly endMs: number;
 	} | null;
 	readonly connectedComposition: _InternalTypes['AnyComposition'] | null;
+	// Label for a child row nested under a track clip, which has no track label
+	// of its own. Matches the name shown in the sidebar row.
+	readonly nestedChildLabel: string | null;
 	readonly activeTrimEdge: 'left' | 'right' | null;
 	readonly isAtTrimLimit: boolean;
 	readonly leftTrimHighlight: {
@@ -408,6 +411,7 @@ const TimelineSequenceBar: React.FC<{
 	captionLabelBounds,
 	captionRange,
 	connectedComposition,
+	nestedChildLabel,
 	activeTrimEdge,
 	isAtTrimLimit,
 	leftTrimHighlight,
@@ -813,7 +817,7 @@ const TimelineSequenceBar: React.FC<{
 
 			{children}
 
-			{(s.timelineTrack || captionRange) &&
+			{(s.timelineTrack || captionRange || nestedChildLabel !== null) &&
 			!isTransition &&
 			labelTextWidth >= MIN_TIMELINE_LABEL_WIDTH ? (
 				<div
@@ -862,7 +866,7 @@ const TimelineSequenceBar: React.FC<{
 							label={
 								s.timelineTrack?.role === 'track' && frozenFrame !== null
 									? `${s.displayName} (frozen at frame ${frozenFrame})`
-									: s.displayName
+									: (nestedChildLabel ?? s.displayName)
 							}
 						>
 							{s.timelineTrack?.role === 'track' && frozenFrame !== null ? (
@@ -877,7 +881,9 @@ const TimelineSequenceBar: React.FC<{
 									}}
 								/>
 							) : null}
-							{s.timelineTrack?.role === 'overlay' ? 'Overlay' : s.displayName}
+							{s.timelineTrack?.role === 'overlay'
+								? 'Overlay'
+								: (nestedChildLabel ?? s.displayName)}
 						</TimelineSequenceLabel>
 					)}
 				</div>
@@ -2627,6 +2633,19 @@ const TimelineSequenceLayoutInner: React.FC<{
 					: null
 			}
 			connectedComposition={connectedCompositions[0] ?? null}
+			nestedChildLabel={
+				!s.timelineTrack &&
+				sceneRange !== null &&
+				s.type === 'sequence' &&
+				!hasCaptionsSchema &&
+				// Frame numbers already fill the clip when this opt-in setting is on.
+				!getStudioShowLayerFrameNumbers()
+					? s.displayName ||
+						(connectedCompositions.length === 1
+							? connectedCompositions[0].id
+							: (s.controls?.componentName ?? '<Sequence>'))
+					: null
+			}
 			activeTrimEdge={activeTrimEdge}
 			isAtTrimLimit={isAtTrimLimit}
 			leftTrimHighlight={
